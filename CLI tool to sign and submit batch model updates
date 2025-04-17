@@ -1,0 +1,70 @@
+use std::{collections::BTreeMap, fs};
+use chrono::Utc;
+use reqwest::blocking::Client;
+use serde_json;
+use base64::{engine::general_purpose, Engine as _};
+use ed25519_dalek::{SigningKey, Signature, Signer};
+
+mod model_hash;
+mod batch_update;
+use batch_update::BatchUpdateRequest;
+
+fn main() {
+    let pubkey_file = "public_key.json";
+    let privkey_file = "private_key.json";
+    let weights_file = "weights.json";
+    let endpoint = "http://localhost:26657/broadcast_tx_sync";
+
+    // Load keys
+    let privkey_bytes = general_purpose::STANDARD
+        .decode(fs::read_to_string(privkey_file).unwrap().trim())
+        .unwrap();
+    let signing_key = SigningKey::from_bytes(&privkey_bytes.try_into().unwrap());
+
+    // Load weights
+    let weight_data = fs::read_to_string(weights_file).unwrap();
+    let weights: BTreeMap<String, f64> = serde_json::from_str(&weight_data).unwrap();
+
+    // Sign and construct batch update
+    let batch = BatchUpdateRequest::new_signed("ens-model-001", 9, weights, &signing_key);
+    let batch_json = serde_json::to_string(&batch).unwrap();
+
+    // Wrap in Tendermint broadcast_tx_sync RPC
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": "tx",
+        "method": "broadcast_tx_sync",
+        "params": {
+            "tx": base64::encode(&batch_json)
+        }
+    });
+
+    // Send
+    let client = Client::new();
+    let res = client
+        .post(endpoint)
+        .json(&payload)
+        .send()
+        .expect("Failed to submit batch");
+
+    println!("Response:
+{}", res.text().unwrap());
+}
+
+What It Does:
+	1.	Loads:
+	•	weights.json (BTreeMap of weights)
+	•	private_key.json (base64 Ed25519 key)
+	2.	Creates and signs a BatchUpdateRequest
+	3.	Sends it to Tendermint via broadcast_tx_sync
+
+⸻
+
+Use:
+	Ensure model_hash.rs and batch_update.rs are also in your project
+	Provide valid:
+	•	weights.json
+	•	private_key.json
+	•	Then run:
+
+cargo run --bin batch_submit_cli
