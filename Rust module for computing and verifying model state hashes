@@ -1,0 +1,45 @@
+use sha2::{Sha256, Digest};
+use serde_json::to_string;
+use std::collections::BTreeMap;
+
+/// Computes a SHA-256 hash of model weights.
+/// The weights must be provided in a BTreeMap to ensure sorted key order.
+pub fn compute_model_hash(weights: &BTreeMap<String, f64>) -> String {
+    let json = to_string(&weights).expect("Serialization failed");
+    let hash = Sha256::digest(json.as_bytes());
+    hex::encode(hash)
+}
+
+/// Example usage (you can remove or adjust for integration)
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn test_model_hash() {
+        let mut weights = BTreeMap::new();
+        weights.insert("1:0".to_string(), 0.028);
+        weights.insert("1:1".to_string(), 0.137);
+        weights.insert("2:0".to_string(), 0.042);
+
+        let hash = compute_model_hash(&weights);
+        println!("Model hash: {}", hash);
+        assert_eq!(hash.len(), 64); // SHA-256 in hex
+    }
+}
+
+	1.	Add the module to client and model keeper apps:
+
+mod model_hash;
+use model_hash::compute_model_hash;
+
+
+	2.	Prepare weights as a BTreeMap<String, f64>
+	3.	Compute the hash:
+
+let hash = compute_model_hash(&weights);
+
+
+	4.	On the client: compare it against the blockchain or API-reported hash
+	5.	On the model keeper: include it when submitting updates
