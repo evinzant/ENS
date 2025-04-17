@@ -1,0 +1,97 @@
+key architectural layer: each node in the swarm (or network) has a defined purpose, clear responsibilities, and interaction rules.
+
+⸻
+
+Node Roles in ENS
+
+4 core node types:
+
+Role	          Description	                                              State	    Has Private Key	  Does Decryption
+Client Node	    Sends encrypted inputs, receives and decrypts outputs	    Stateless	Yes	              Yes
+Swarm Node	    Performs encrypted computation over Paillier ciphertexts	Stateless	No	              No
+Model Keeper	  Proposes or applies weight updates, stores model state	  Stateful	Optional	        No
+Blockchain Node	Maintains weight update ledger and provides state sync	  Stateful	No	              No
+
+⸻
+
+1. Client Node
+
+Responsibilities:
+	•	Generate and hold a Paillier keypair
+	•	Encrypt inputs using public key
+	•	Send encrypted values + weights to swarm nodes
+	•	Receive encrypted results
+	•	Decrypt outputs
+
+Behavior:
+	•	Stateless between sessions (but holds private key)
+	•	CLI tool or GUI interface
+	•	Can query blockchain for model metadata and sync state
+
+⸻
+
+2. Swarm Node
+
+Responsibilities:
+	•	Receive encrypted values + weights
+	•	Perform Paillier homomorphic operations (addition, scalar multiplication)
+	•	Return encrypted results
+
+Behavior:
+	•	Stateless — pulls public key on startup
+	•	Performs only math — cannot decrypt
+	•	Optionally verifies weights from blockchain
+
+Communication:
+	•	JSON-RPC over HTTP (current)
+	•	Could evolve to WebSocket or gRPC
+
+⸻
+
+3. Model Keeper
+
+Responsibilities:
+	•	Maintains model weights (in plaintext)
+	•	Submits model updates as transactions to blockchain
+	•	Signs updates with its private key
+
+Behavior:
+	•	Stateful — tracks current model version
+	•	Can coordinate training rounds
+	•	May be a standalone service or co-located with a client
+
+⸻
+
+4. Blockchain Node
+
+Responsibilities:
+	•	Runs Tendermint full node
+	•	Maintains ledger of weight updates
+	•	Responds to abci_query calls for model state
+	•	Validates transactions (e.g., correct author, proper format)
+
+Behavior:
+	•	Stateful — stores full chain history
+	•	No compute or cryptographic capabilities
+	•	Can be run independently of swarm or client
+
+⸻
+
+Node Interactions Summary
+
+    [ Client Node ]
+        |
+        | 1. Sends encrypted input + weights
+        v
+    [ Swarm Node ]
+        |
+        | 2. Sends encrypted result
+        v
+    [ Client Node ] -- decrypts result
+        |
+        | 3. Trains / updates weights
+        v
+    [ Model Keeper ] -- submits tx
+        |
+        v
+    [ Blockchain Node ]
