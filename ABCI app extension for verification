@@ -1,0 +1,64 @@
+use abci::*;
+use async_trait::async_trait;
+use crate::batch_update::BatchUpdateRequest;
+use base64::{engine::general_purpose, Engine as _};
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use sha2::{Digest, Sha256};
+use serde_json;
+
+#[async_trait]
+impl Application for ENSApp {
+    async fn check_tx(&self, req: RequestCheckTx) -> ResponseCheckTx {
+        let tx = match std::str::from_utf8(&req.tx) {
+            Ok(json) => json,
+            Err(_) => return ResponseCheckTx { code: 1, log: "Invalid UTF-8".into(), ..Default::default() },
+        };
+
+        let batch: BatchUpdateRequest = match serde_json::from_str(tx) {
+            Ok(data) => data,
+            Err(_) => return ResponseCheckTx { code: 2, log: "Malformed JSON".into(), ..Default::default() },
+        };
+
+        if !verify_batch_signature(&batch) {
+            return ResponseCheckTx { code: 3, log: "Invalid signature".into(), ..Default::default() };
+        }
+
+        ResponseCheckTx { code: 0, log: "Valid batch update".into(), ..Default::default() }
+    }
+
+    async fn deliver_tx(&self, req: RequestDeliverTx) -> ResponseDeliverTx {
+        let tx = std::str::from_utf8(&req.tx).unwrap();
+        let batch: BatchUpdateRequest = serde_json::from_str(tx).unwrap();
+
+        if !verify_batch_signature(&batch) {
+            return ResponseDeliverTx { code: 1, log: "Invalid signature".into(), ..Default::default() };
+        }
+
+        // Store weights, update state, etc. (application-specific logic here)
+        println!("Applied batch update for model: {}", batch.model_id);
+
+        ResponseDeliverTx { code: 0, log: "Batch applied".into(), ..Default::default() }
+    }
+}
+
+fn verify_batch_signature(batch: &BatchUpdateRequest) -> bool {
+    let hash_bytes = batch.state_hash.as_bytes();
+    let pub_key_bytes = match general_purpose::STANDARD.decode(&batch.author) {
+        Ok(bytes) => bytes,
+        Err(_) => return false,
+    };
+    let sig_bytes = match general_purpose::STANDARD.decode(&batch.signature) {
+        Ok(bytes) => bytes,
+        Err(_) => return false,
+    };
+
+    let pubkey = VerifyingKey::from_bytes(&pub_key_bytes).ok()?;
+    let signature = Signature::from_bytes(&sig_bytes).ok()?;
+
+    pubkey.verify(hash_bytes, &signature).is_ok()
+}
+
+This file adds:
+	•	BatchUpdateRequest support in check_tx and deliver_tx
+	•	Signature verification using Ed25519
+	•	Logging and response codes for invalid or successful transactions
