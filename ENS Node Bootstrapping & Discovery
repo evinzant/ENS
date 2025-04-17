@@ -1,0 +1,89 @@
+How each node type starts up, connects to the rest of the system, and finds the necessary info (keys, peers, model metadata).
+
+⸻
+
+Swarm Node Bootstrapping
+
+Loads public_key.json from config or URL
+Registers itself with a directory service or peer bootstrap list
+Waits for encrypted input jobs via RPC or pub/sub
+Performs compute and returns result
+
+Key Details:
+	•	Stateless: does not persist anything across restarts
+	•	Can be added/removed at will
+	•	Must trust that the public key is authentic (optional signed metadata)
+
+⸻
+
+Client Node Bootstrapping
+
+Loads or generates private_key.json and public_key.json
+Queries the blockchain (or a registry) for model metadata:
+
+   - Model ID, weight version, available swarm nodes |
+
+|    | Connects to a swarm node (manually or auto-selected)
+|    | Encrypts inputs, sends request, receives result
+|    | Verifies model state hash matches blockchain state |
+
+Optional:
+	•	May verify that model weights match hash stored in blockchain
+	•	May track history of decrypted outputs
+
+⸻
+
+Model Keeper Bootstrapping
+
+Loads or initializes model weights
+Queries blockchain to get current model version/hash
+Submits signed updates to blockchain via Tendermint
+(Optional) publishes updates to Swarm nodes (cache or broadcast)
+
+⸻
+
+Blockchain Node Bootstrapping
+
+Loads genesis.json and chain data from disk
+Starts Tendermint node and connects to peers
+Runs the ABCI app (ENS)
+Responds to abci_query and verifies transactions
+
+⸻
+
+Discovery Options
+
+Make ENS flexible — choose based on scale and trust level.
+
+A. Static Config (Good for small deployments)
+
+Each node loads a static file:
+
+[swarm]
+nodes = ["https://swarm1.local", "https://swarm2.local"]
+
+[blockchain]
+rpc = "http://localhost:26657"
+
+B. Central Registry (Optional Service)
+
+A small HTTPS API that returns:
+	•	List of swarm nodes
+	•	Model IDs and metadata
+	•	Public keys and model hashes
+
+Could live on a full node or model keeper.
+
+C. Peer-to-Peer Swarm Gossip (Future Feature)
+
+Swarm nodes could discover each other using:
+	•	mDNS for LAN
+	•	libp2p or GossipSub for wide-area
+	•	Or piggyback on Tendermint peer discovery
+
+⸻
+
+Security Considerations
+	•	All bootstrap info should be signed or hashed (e.g., public key fingerprint, model ID, hash of weights)
+	•	Clients must verify that the model state they’re using matches what the blockchain says
+	•	Optionally enforce TLS mutual auth between swarm nodes and clients (e.g., client presents cert)
