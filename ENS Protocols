@@ -1,0 +1,98 @@
+Focus Area	     Goal
+Message Formats	 Define the payload structures exchanged across nodes
+Peer Discovery	 Enable nodes to find each other at runtime
+State Sync	     Ensure nodes can sync model weights and blockchain state
+Verification	   Confirm authenticity, integrity, and consensus of operations
+
+Message Formats are defined in JSON Schema and OpenAPI:
+
+Message	               Used For	                        Transport
+AccumulateRequest	     Client → Swarm (compute task)	  HTTPS POST /accumulate
+WeightUpdateRequest	   Model Keeper → Blockchain	      Tendermint transaction or HTTP POST /submit-update
+StatusResponse	       Healthcheck & identity info	    HTTPS GET /status
+ENSError	             Standardized error replies	      Any
+
+All messages:
+	•	Use UTF-8 JSON
+	•	Support base64 encoding for ciphertexts
+	•	Are authenticated (e.g., via bearer token or signature)
+
+⸻
+
+Peer Discovery
+
+How do nodes find each other?
+
+Option A: Static Config (MVP)
+
+Each node loads peers from a local file:
+
+[swarm]
+peers = ["https://node1.local:3000", "https://node2.local:3000"]
+
+[blockchain]
+rpc = "http://192.168.1.100:26657"
+
+Option B: Discovery Service (v2)
+
+A central HTTPS endpoint (optional):
+
+GET /registry
+→ Returns: list of active swarm nodes, public keys, model metadata
+
+Option C: Peer Gossip (future)
+
+Using libp2p or Tendermint’s P2P stack for decentralized discovery.
+
+⸻
+
+State Synchronization
+
+How do new nodes catch up to the current model?
+
+Swarm Node Sync
+	•	Pulls public key (public_key.json)
+	•	Verifies fingerprint from /status or blockchain metadata
+	•	(Optional) Checks model ID and state hash from blockchain /model/:id
+
+Client Node Sync
+	•	Queries Tendermint ABCI or indexer:
+
+GET /model/ens-model-001
+→ { weights, version, last_updated, hash }
+
+	•	Verifies model weights match on-chain hash
+
+Model Keeper Sync
+	•	Tracks versioned weights in a local or distributed DB
+	•	Queries blockchain state before pushing updates
+	•	Signs update proposals before submitting
+
+⸻
+
+Verification
+
+How to ensure trust and data integrity?
+
+Element	Verification Method
+Transactions	Ed25519 signature checked in check_tx
+Swarm Results	Decrypted + compared against expected accumulations
+Model Weights	Hashed and verified against blockchain state hash
+Peers	Public key fingerprint, token-based authentication
+
+Additional Optional Enhancements:
+	•	ZK-proofs for verifying computation correctness (future)
+	•	TLS mutual auth for swarm-client verification
+	•	Merkle proofs for decentralized model state validation
+
+⸻
+
+Putting It All Together: Example Workflow
+
+1. Client → discovers swarm node via static config or registry
+2. Client → encrypts inputs, POSTs to /accumulate
+3. Swarm node → homomorphically accumulates, returns encrypted result
+4. Client → decrypts result locally
+5. Model Keeper → trains model, submits update to blockchain
+6. Blockchain → stores and verifies update (via Tendermint)
+7. All nodes → can query or verify model state via /model/:id or /status
