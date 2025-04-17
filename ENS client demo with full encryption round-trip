@@ -1,0 +1,129 @@
+This utility will:
+	1.	Load the Paillier public and private keys
+	2.	Encrypt input values
+	3.	Send with weights to the swarm node via JSON-RPC
+	4.	Receive the encrypted result
+	5.	Decrypt the final output locally
+
+⸻
+
+ENS Client Demo – Full Encryption Round-Trip
+
+⸻
+
+1. Update Cargo.toml for the Client
+
+[dependencies]
+reqwest = { version = "0.11", features = ["json", "blocking"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+paillier = "0.4"
+base64 = "0.21"
+num-bigint = "0.4"
+
+⸻
+
+2. File: client.rs
+
+use base64::{decode, encode};
+use paillier::*;
+use paillier::encoding::BigInt;
+use reqwest::blocking::Client;
+use serde::{Deserialize, Serialize};
+use std::fs;
+
+// Key imports
+#[derive(Deserialize)]
+struct PublicKeyImport {
+    n: String,
+}
+#[derive(Deserialize)]
+struct PrivateKeyImport {
+    n: String,
+    p: String,
+    q: String,
+}
+
+// RPC request/response
+#[derive(Serialize)]
+struct EncryptedInput {
+    ciphertext: String,
+    weight: f64,
+}
+#[derive(Serialize)]
+struct AccumulateRequest {
+    inputs: Vec<EncryptedInput>,
+}
+#[derive(Deserialize)]
+struct AccumulateResponse {
+    result: String,
+}
+
+// Load keys
+fn load_keys(pub_path: &str, priv_path: &str) -> (PublicKey, PrivateKey) {
+    let pub_json = fs::read_to_string(pub_path).unwrap();
+    let priv_json = fs::read_to_string(priv_path).unwrap();
+
+    let pub_key: PublicKeyImport = serde_json::from_str(&pub_json).unwrap();
+    let priv_key: PrivateKeyImport = serde_json::from_str(&priv_json).unwrap();
+
+    let n = BigInt::from_bytes_be(&decode(pub_key.n).unwrap());
+    let p = BigInt::from_bytes_be(&decode(priv_key.p).unwrap());
+    let q = BigInt::from_bytes_be(&decode(priv_key.q).unwrap());
+
+    (PublicKey { n }, PrivateKey { p, q })
+}
+
+fn main() {
+    let (ek, dk) = load_keys("public_key.json", "private_key.json");
+
+    // Input values and weights
+    let inputs = vec![(7, 3.0), (4, 5.0)];
+
+    // Encrypt values
+    let encrypted_inputs: Vec<EncryptedInput> = inputs
+        .into_iter()
+        .map(|(val, weight)| {
+            let ct = Paillier::encrypt(&ek, BigInt::from(val));
+            EncryptedInput {
+                ciphertext: encode(ct.to_bytes_be()),
+                weight,
+            }
+        })
+        .collect();
+
+    // Prepare and send request
+    let payload = AccumulateRequest {
+        inputs: encrypted_inputs,
+    };
+
+    let client = Client::new();
+    let res = client
+        .post("http://localhost:3000/accumulate")
+        .json(&payload)
+        .send()
+        .expect("Failed to send request");
+
+    let response: AccumulateResponse = res.json().expect("Failed to parse response");
+    let result_ct = BigInt::from_bytes_be(&decode(response.result).unwrap());
+
+    // Decrypt final output
+    let decrypted: BigInt = Paillier::decrypt(&dk, result_ct);
+    println!("Decrypted result: {}", decrypted);
+}
+
+⸻
+
+3. Run It
+
+Make sure:
+	•	swarm node is running on localhost:3000
+	•	keys are present in the working directory
+
+cargo run --bin client
+
+Output:
+
+Decrypted result: 41
+
+(Which is 7*3 + 4*5 = 21 + 20 = 41)
