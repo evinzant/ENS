@@ -1,0 +1,83 @@
+Paillier key generation utility that produces:
+	•	A 2048-bit Paillier keypair
+	•	A public key file (public_key.json) for swarm nodes
+	•	A private key file (private_key.json) for the client or decryptor
+
+Use the paillier crate for key generation, encryption, and decryption with BigInt.
+
+⸻
+
+Add Dependencies to Cargo.toml
+
+[dependencies]
+paillier = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+num-bigint = "0.4"
+base64 = "0.21"
+
+⸻
+
+Create keygen.rs
+
+use paillier::*;
+use paillier::encoding::BigInt;
+use serde::{Serialize, Deserialize};
+use std::fs::File;
+use std::io::Write;
+
+#[derive(Serialize, Deserialize)]
+struct PublicKeyExport {
+    n: String,  // modulus n (base64)
+}
+
+#[derive(Serialize, Deserialize)]
+struct PrivateKeyExport {
+    n: String,  // modulus n (for matching)
+    p: String,  // secret prime p
+    q: String,  // secret prime q
+}
+
+fn main() {
+    // Generate 2048-bit keypair
+    let (ek, dk) = Paillier::keypair_with_modulus_size(2048).keys();
+
+    // Extract components from keys
+    let PublicKey { n } = ek.clone();
+    let PrivateKey { p, q } = dk;
+
+    // Encode as base64 strings
+    let n_b64 = base64::encode(n.to_bytes_be());
+    let p_b64 = base64::encode(p.to_bytes_be());
+    let q_b64 = base64::encode(q.to_bytes_be());
+
+    // Save public key
+    let pub_key = PublicKeyExport { n: n_b64.clone() };
+    let pub_json = serde_json::to_string_pretty(&pub_key).unwrap();
+    let mut pub_file = File::create("public_key.json").unwrap();
+    pub_file.write_all(pub_json.as_bytes()).unwrap();
+
+    // Save private key
+    let priv_key = PrivateKeyExport {
+        n: n_b64,
+        p: p_b64,
+        q: q_b64,
+    };
+    let priv_json = serde_json::to_string_pretty(&priv_key).unwrap();
+    let mut priv_file = File::create("private_key.json").unwrap();
+    priv_file.write_all(priv_json.as_bytes()).unwrap();
+
+    println!("Paillier keypair generated:");
+    println!("→ public_key.json");
+    println!("→ private_key.json");
+}
+
+⸻
+
+Build & Run
+
+cargo run --bin keygen
+
+Produces two files:
+	•	public_key.json – share with nodes
+	•	private_key.json – keep secure, for decryption only
