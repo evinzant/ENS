@@ -1,0 +1,49 @@
+use rusqlite::{params, Connection, Result};
+use std::collections::BTreeMap;
+
+/// Initialize the SQLite DB and create the weights table
+pub fn init_db(path: &str) -> Result<Connection> {
+    let conn = Connection::open(path)?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS weights (
+            model_id TEXT,
+            key TEXT,
+            value REAL,
+            PRIMARY KEY (model_id, key)
+        )",
+        [],
+    )?;
+    Ok(conn)
+}
+
+/// Save all weights for a given model ID
+pub fn save_weights(conn: &Connection, model_id: &str, weights: &BTreeMap<String, f64>) -> Result<()> {
+    let tx = conn.transaction()?;
+    for (key, val) in weights {
+        tx.execute(
+            "INSERT OR REPLACE INTO weights (model_id, key, value) VALUES (?1, ?2, ?3)",
+            params![model_id, key, val],
+        )?;
+    }
+    tx.commit()
+}
+
+/// Load all weights for a given model ID
+pub fn load_weights(conn: &Connection, model_id: &str) -> Result<BTreeMap<String, f64>> {
+    let mut stmt = conn.prepare("SELECT key, value FROM weights WHERE model_id = ?1")?;
+    let mut rows = stmt.query(params![model_id])?;
+
+    let mut map = BTreeMap::new();
+    while let Some(row) = rows.next()? {
+        let key: String = row.get(0)?;
+        let value: f64 = row.get(1)?;
+        map.insert(key, value);
+    }
+
+    Ok(map)
+}
+
+Features:
+	•	Initializes a weights.db with a simple weights table
+	•	Saves and loads weights using a BTreeMap<String, f64>
+	•	Supports multiple models via the model_id key
