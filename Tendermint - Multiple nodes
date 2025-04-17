@@ -1,0 +1,152 @@
+Running ENS + Tendermint on Multiple Nodes
+
+⸻
+
+Tendermint nodes form a peer-to-peer consensus network.
+Rust ABCI app runs beside Tendermint on each node.
+
+⸻
+
+POC for 3 machines (real or virtual):
+
+Node	Role	IP Address
+A	Initial validator	192.168.1.10
+B	Peer node	192.168.1.11
+C	Peer node	192.168.1.12
+
+⸻
+
+1. Install Tendermint + ABCI App on All Nodes
+
+Repeat on all nodes:
+
+tendermint init
+cargo build --release
+
+Copy built ABCI binary to each node (or build there).
+
+⸻
+
+2. Copy genesis.json from Node A to B and C
+
+Generate the chain config on Node A:
+
+tendermint init
+
+Then copy ~/.tendermint/config/genesis.json to Nodes B and C.
+
+Ensures all nodes have the same chain ID and genesis state.
+
+⸻
+
+3. Collect Public Node IDs
+
+On each node, run:
+
+tendermint show-node-id
+
+Save the output from each (e.g., node_id@ip:26656)
+
+⸻
+
+4. Update Peers in config.toml
+
+On each node, edit ~/.tendermint/config/config.toml:
+
+# Enable peer discovery
+pex = true
+
+# Set persistent peers (comma-separated list)
+persistent_peers = "nodeA_id@192.168.1.10:26656,nodeB_id@192.168.1.11:26656,nodeC_id@192.168.1.12:26656"
+
+⸻
+
+5. Run ABCI App and Tendermint on All Nodes
+
+Start ABCI app (each on its own machine):
+
+./ens_abci
+
+Then start Tendermint:
+
+tendermint start
+
+Creates a multi-node ENS chain.
+
+⸻
+
+Optional: Enable Validator Voting (Proof-of-Concept)
+
+In genesis.json, define multiple validators by public key. Causes nodes to vote (instead of just observe).
+
+⸻
+
+Add State Query Support to ENS ABCI App
+
+⸻
+
+Other nodes (or users) can fetch current model weights using Tendermint’s abci_query RPC.
+
+⸻
+
+1. Implement query Method in ABCI App
+
+Update ENSApp struct implementation:
+
+use abci::*;
+
+#[async_trait]
+impl Application for ENSApp {
+    // ... other methods ...
+
+    async fn query(&self, req: RequestQuery) -> ResponseQuery {
+        let key = req.data;
+
+        // Key format: "layer:neuron"
+        let key_str = String::from_utf8(key.to_vec()).unwrap_or_default();
+        let parts: Vec<&str> = key_str.split(':').collect();
+
+        if parts.len() != 2 {
+            return ResponseQuery {
+                code: 1,
+                log: "Invalid key format. Use 'layer:neuron'".to_string(),
+                ..Default::default()
+            };
+        }
+
+        let layer: u32 = parts[0].parse().unwrap_or(0);
+        let neuron: u32 = parts[1].parse().unwrap_or(0);
+
+        let model = MODEL_STATE.lock().unwrap();
+        let weight = model.weights.get(&(layer, neuron)).copied().unwrap_or(0.0);
+
+        ResponseQuery {
+            code: 0,
+            value: weight.to_be_bytes().to_vec(), // Float as binary
+            log: format!("Weight for [{}:{}] is {}", layer, neuron, weight),
+            ..Default::default()
+        }
+    }
+}
+
+
+
+⸻
+
+2. Query Using Curl
+
+curl "http://localhost:26657/abci_query?data=\"1:4\""
+
+Queries for layer 1, neuron 4.
+
+Returns a base64-encoded binary float back:
+
+{
+  "result": {
+    "response": {
+      "code": 0,
+      "value": "P3FhODgAAAA=",
+      "log": "Weight for [1:4] is 0.131"
+    }
+  }
+}
