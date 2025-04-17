@@ -1,0 +1,12 @@
+What Tendermint provides:
+	•	Consensus (BFT): Byzantine Fault Tolerant consensus across nodes
+	•	Networking: Peer discovery, block propagation, transaction gossip
+	•	Security: Signed transactions, public key identity
+	•	Flexibility: You define what goes in the blocks — we control the logic
+
+What is built on top:
+	•	A custom ENS application that defines how:
+	•	Model weight updates are structured
+	•	Transactions are validated and accepted into the chain
+	•	Nodes query the current model state
+	•	The system syncs model state across the swarm
