@@ -1,0 +1,12 @@
+When a new transaction is submitted:
+	1.	Verify Signature
+	•	Confirm the author is known and the signature is valid
+	2.	Check Model ID
+	•	Make sure this model exists (or allow implicit creation)
+	3.	Validate Weights
+	•	Ensure weights are floats (or quantized ints), within acceptable range
+	4.	Store Update
+	•	Append to transaction log
+	•	Update current in-memory model state
+	5.	Broadcast Result
+	•	Allow nodes to fetch updated model weights if needed
