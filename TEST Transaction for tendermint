@@ -1,0 +1,347 @@
+Generate a Real Ed25519 Keypair (Rust)
+
+Minimal Rust program to generate a keypair and print in base64:
+
+use ed25519_dalek::{Keypair, Signer};
+use rand::rngs::OsRng;
+use base64::{encode};
+
+fn main() {
+    let mut csprng = OsRng;
+    let keypair = Keypair::generate(&mut csprng);
+
+    println!("Public Key (base64): {}", encode(keypair.public.to_bytes()));
+    println!("Private Key (base64): {}", encode(keypair.to_bytes()));
+}
+
+⸻
+
+Create Unsigned Transaction Payload
+
+Here’s the JSON before signing:
+
+{
+  "type": "WeightUpdate",
+  "model_id": "ens-model-001",
+  "layer": 1,
+  "neuron": 4,
+  "old_weight": 0.128,
+  "new_weight": 0.131,
+  "update_reason": "gradient_descent",
+  "timestamp": "2025-04-16T21:00:00Z",
+  "author": "<your base64 public key here>",
+  "signature": ""
+}
+
+⸻
+
+Sign the Payload
+
+Rust snippet to sign JSON without signature field:
+
+use ed25519_dalek::{Keypair, Signature, Signer};
+use serde_json::json;
+use chrono::Utc;
+use base64::{encode, decode};
+
+fn main() {
+    let private_key_bytes = decode("<your base64 private key>").unwrap();
+    let keypair = Keypair::from_bytes(&private_key_bytes).unwrap();
+
+    let tx = json!({
+        "type": "WeightUpdate",
+        "model_id": "ens-model-001",
+        "layer": 1,
+        "neuron": 4,
+        "old_weight": 0.128,
+        "new_weight": 0.131,
+        "update_reason": "gradient_descent",
+        "timestamp": Utc::now().to_rfc3339(),
+        "author": encode(keypair.public.to_bytes()),
+        "signature": ""
+    });
+
+    let signing_bytes = serde_json::to_vec(&tx).unwrap();
+    let sig = keypair.sign(&signing_bytes);
+    let sig_base64 = encode(sig.to_bytes());
+
+    let signed_tx = json!({
+        "type": "WeightUpdate",
+        "model_id": "ens-model-001",
+        "layer": 1,
+        "neuron": 4,
+        "old_weight": 0.128,
+        "new_weight": 0.131,
+        "update_reason": "gradient_descent",
+        "timestamp": Utc::now().to_rfc3339(),
+        "author": encode(keypair.public.to_bytes()),
+        "signature": sig_base64
+    });
+
+    println!("{}", serde_json::to_string_pretty(&signed_tx).unwrap());
+}
+
+This will print a full JSON transaction.
+
+⸻
+
+Submit Transaction
+Rust Program: submit_tx.rs
+
+use std::process::Command;
+use base64::{engine::general_purpose, Engine as _};
+use std::fs;
+
+fn main() {
+    // Load signed transaction JSON from file
+    let raw_tx = fs::read_to_string("signed_tx.json")
+        .expect("failed to read signed_tx.json");
+
+    // Remove whitespace, base64 encode
+    let compact_tx: String = raw_tx.chars().filter(|c| !c.is_whitespace()).collect();
+    let encoded_tx = general_purpose::STANDARD.encode(compact_tx.as_bytes());
+
+    // Create the full curl command payload
+    let rpc_payload = format!(r#"{{
+        "jsonrpc": "2.0",
+        "id": "tx",
+        "method": "broadcast_tx_sync",
+        "params": {{
+            "tx": "{}"
+        }}
+    }}"#, encoded_tx);
+
+    // Run curl
+    let output = Command::new("curl")
+        .arg("-X")
+        .arg("POST")
+        .arg("http://localhost:26657")
+        .arg("-H")
+        .arg("Content-Type: application/json")
+        .arg("-d")
+        .arg(&rpc_payload)
+        .output()
+        .expect("failed to execute curl");
+
+    println!("Response:\n{}", String::from_utf8_lossy(&output.stdout));
+    eprintln!("Error (if any):\n{}", String::from_utf8_lossy(&output.stderr));
+}
+
+
+
+⸻
+
+Usage Instructions
+
+1. Save signed transaction
+
+Create a file called signed_tx.json in the same directory:
+
+{
+  "type": "WeightUpdate",
+  "model_id": "ens-model-001",
+  "layer": 1,
+  "neuron": 4,
+  "old_weight": 0.128,
+  "new_weight": 0.131,
+  "update_reason": "gradient_descent",
+  "timestamp": "2025-04-16T21:00:00Z",
+  "author": "<your base64 pubkey>",
+  "signature": "<your base64 signature>"
+}
+
+2. Build & Run program
+
+cargo run --bin submit_tx
+
+This will:
+	•	Encode the JSON
+	•	Submit the request to Tendermint
+	•	Print the response to stdout/stderr
+
+⸻
+
+Version 2.0 includes:
+	•	Error checking for invalid base64 and required fields
+	•	CLI argument support for specifying the input JSON file
+	•	Inline signing using a private key file (Ed25519)
+
+⸻
+
+Enhanced Rust Utility (V2.0): 
+submit_tx.rs
+
+use base64::{engine::general_purpose, Engine as _};
+use chrono::{DateTime, Utc};
+use ed25519_dalek::{Keypair, Signature, Signer};
+use serde::{Deserialize, Serialize};
+use serde_json::{from_str, json, Value};
+use std::{
+    env,
+    fs,
+    process::Command,
+};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct UnsignedWeightUpdate {
+    model_id: String,
+    layer: u32,
+    neuron: u32,
+    old_weight: f64,
+    new_weight: f64,
+    update_reason: String,
+    timestamp: Option<String>, // auto-generate if not provided
+    author: String,
+}
+
+fn main() {
+    // Parse CLI arguments
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 3 {
+        eprintln!("Usage: {} <signed_tx.json> <private_key_base64.txt>", args[0]);
+        return;
+    }
+
+    let json_path = &args[1];
+    let privkey_path = &args[2];
+
+    // Load transaction JSON
+    let raw_json = match fs::read_to_string(json_path) {
+        Ok(content) => content,
+        Err(_) => {
+            eprintln!("Failed to read {}", json_path);
+            return;
+        }
+    };
+
+    // Load and decode private key
+    let privkey_b64 = match fs::read_to_string(privkey_path) {
+        Ok(content) => content.trim().to_string(),
+        Err(_) => {
+            eprintln!("Failed to read {}", privkey_path);
+            return;
+        }
+    };
+
+    let privkey_bytes = match general_purpose::STANDARD.decode(&privkey_b64) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            eprintln!("Invalid base64 in private key file");
+            return;
+        }
+    };
+
+    let keypair = match Keypair::from_bytes(&privkey_bytes) {
+        Ok(kp) => kp,
+        Err(_) => {
+            eprintln!("Invalid private key format");
+            return;
+        }
+    };
+
+    // Parse unsigned JSON
+    let tx: UnsignedWeightUpdate = match from_str(&raw_json) {
+        Ok(tx) => tx,
+        Err(_) => {
+            eprintln!("Invalid transaction JSON format");
+            return;
+        }
+    };
+
+    // Auto-generate timestamp if needed
+    let timestamp = tx.timestamp.unwrap_or_else(|| Utc::now().to_rfc3339());
+
+    // Create the unsigned transaction for signing
+    let unsigned_payload = json!({
+        "type": "WeightUpdate",
+        "model_id": tx.model_id,
+        "layer": tx.layer,
+        "neuron": tx.neuron,
+        "old_weight": tx.old_weight,
+        "new_weight": tx.new_weight,
+        "update_reason": tx.update_reason,
+        "timestamp": timestamp,
+        "author": tx.author,
+        "signature": "" // clear for signing
+    });
+
+    let signing_bytes = serde_json::to_vec(&unsigned_payload).unwrap();
+    let sig = keypair.sign(&signing_bytes);
+    let sig_b64 = general_purpose::STANDARD.encode(sig.to_bytes());
+
+    // Final signed transaction
+    let signed_payload = json!({
+        "type": "WeightUpdate",
+        "model_id": tx.model_id,
+        "layer": tx.layer,
+        "neuron": tx.neuron,
+        "old_weight": tx.old_weight,
+        "new_weight": tx.new_weight,
+        "update_reason": tx.update_reason,
+        "timestamp": timestamp,
+        "author": tx.author,
+        "signature": sig_b64
+    });
+
+    // Base64-encode and prepare JSON-RPC
+    let compact = serde_json::to_string(&signed_payload).unwrap();
+    let encoded_tx = general_purpose::STANDARD.encode(compact);
+
+    let rpc_payload = json!({
+        "jsonrpc": "2.0",
+        "id": "tx",
+        "method": "broadcast_tx_sync",
+        "params": {
+            "tx": encoded_tx
+        }
+    });
+
+    let rpc_json = serde_json::to_string(&rpc_payload).unwrap();
+
+    // Execute curl
+    let output = Command::new("curl")
+        .arg("-X").arg("POST")
+        .arg("http://localhost:26657")
+        .arg("-H").arg("Content-Type: application/json")
+        .arg("-d").arg(&rpc_json)
+        .output()
+        .expect("failed to execute curl");
+
+    println!("Response:\n{}", String::from_utf8_lossy(&output.stdout));
+    eprintln!("Error (if any):\n{}", String::from_utf8_lossy(&output.stderr));
+}
+
+
+
+⸻
+
+Usage
+
+Create unsigned JSON (example: tx.json)
+
+{
+  "model_id": "ens-model-001",
+  "layer": 1,
+  "neuron": 4,
+  "old_weight": 0.128,
+  "new_weight": 0.131,
+  "update_reason": "gradient_descent",
+  "author": "<your base64 pubkey>"
+}
+
+Note: timestamp is optional; it will be auto-generated if omitted.
+
+Save private key in privkey.txt
+
+(from your earlier keygen program)
+
+Run:
+
+cargo run --bin submit_tx tx.json privkey.txt
+
+⸻
+
+Future Use Cases
+	•	Include this hash in a Merkle tree
+	•	Lookup key in a file or DB
+	•	Verify it in another chain using zero-knowledge or proof-of-existence systems
