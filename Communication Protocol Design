@@ -1,0 +1,129 @@
+Request/response formats
+Endpoints
+Authentication
+Recommended transport stack
+Error handling & status codes
+
+This layer ensures that clients, swarm nodes, model keepers, and even monitoring tools can interact in a clean, consistent, and secure way.
+
+⸻
+
+ENS Communication Protocol Design
+
+⸻
+
+1. Transport Stack
+
+Layer	        Tech	Purpose
+Transport	    HTTPS (REST/JSON-RPC)	Simple, secure communication
+Encoding	    JSON	Interoperable and human-readable
+Signing/Auth	Token (Bearer or custom header)	Lightweight, stateless auth
+
+Using REST/JSON over HTTPS initially, with optional upgrade to gRPC or WebSockets later.
+
+⸻
+
+2. Core Endpoints (Swarm Node)
+
+POST /accumulate
+	•	Purpose: Perform encrypted weighted accumulation on Paillier-encrypted inputs
+
+Request:
+
+{
+  "inputs": [
+    { "ciphertext": "BASE64_STRING", "weight": 3.0 },
+    { "ciphertext": "BASE64_STRING", "weight": 5.0 }
+  ]
+}
+
+Headers:
+
+Authorization: Bearer <ENS_TOKEN>
+Content-Type: application/json
+
+Response:
+
+{
+  "result": "BASE64_ENCRYPTED_SUM"
+}
+
+
+
+⸻
+
+GET /status
+	•	Purpose: Healthcheck, version, node type
+
+Response:
+
+{
+  "node": "swarm",
+  "version": "0.1.0",
+  "public_key_fingerprint": "abc123...",
+  "model_id": "ens-model-001"
+}
+
+
+
+⸻
+
+3. Core Endpoints (Model Keeper)
+
+POST /submit-update
+	•	Submits a signed weight update to the blockchain
+
+{
+  "model_id": "ens-model-001",
+  "layer": 1,
+  "neuron": 4,
+  "old_weight": 0.128,
+  "new_weight": 0.131,
+  "update_reason": "gradient_descent",
+  "timestamp": "2025-04-17T00:00:00Z",
+  "author": "<base64 public key>",
+  "signature": "<base64 signature>"
+}
+
+Model keeper internally relays this to the Tendermint RPC or ENS ABCI app.
+
+⸻
+
+4. Core Endpoints (Blockchain Query Node)
+
+GET /model/:id
+	•	Returns the current model hash, version, and latest weights
+
+{
+  "model_id": "ens-model-001",
+  "version": 8,
+  "last_updated": "2025-04-17T00:01:00Z",
+  "weights": {
+    "1:4": 0.131,
+    "1:5": 0.128,
+    ...
+  }
+}
+
+Could be backed by an indexer or served from ABCI query() directly
+
+⸻
+
+5. Error Handling
+
+Use standard HTTP codes with optional structured errors.
+
+Example Error Response (HTTP 400/401):
+
+{
+  "error": "Invalid signature",
+  "code": 1003,
+  "hint": "Make sure the input is signed with a known key"
+}
+
+Code	Meaning
+400	Malformed request
+401	Unauthorized
+403	Forbidden (bad token)
+500	Internal error
+1001+	ENS-specific error codes
