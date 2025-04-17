@@ -1,0 +1,109 @@
+Expose the swarm logic via a JSON-RPC API using a lightweight Rust server
+Build the client demo that encrypts inputs, sends them, and decrypts the result
+
+⸻
+
+Step 1: JSON-RPC Server for Swarm Node
+
+Using axum — a fast, minimal async HTTP framework for Rust.
+
+⸻
+
+Add Dependencies to Cargo.toml
+
+[dependencies]
+tokio = { version = "1.36", features = ["full"] }
+axum = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+paillier = "0.4"
+base64 = "0.21"
+num-bigint = "0.4"
+
+⸻
+
+Define Request and Response Types
+
+use serde::{Deserialize, Serialize};
+use paillier::encoding::BigInt;
+
+#[derive(Deserialize)]
+struct EncryptedInput {
+    ciphertext: String, // base64 encoded
+    weight: f64,
+}
+
+#[derive(Deserialize)]
+struct AccumulateRequest {
+    inputs: Vec<EncryptedInput>,
+}
+
+#[derive(Serialize)]
+struct AccumulateResponse {
+    result: String, // base64-encoded encrypted result
+}
+
+⸻
+
+Handler Logic
+
+use axum::{routing::post, Router, Json};
+use std::{fs, net::SocketAddr};
+use base64::{decode, encode};
+use paillier::*;
+
+#[tokio::main]
+async fn main() {
+    // Load public key
+    let ek = load_public_key("public_key.json");
+
+    // Share it via Arc if needed
+    let app = Router::new().route("/accumulate", post(move |req| handler(req, ek.clone())));
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    println!("Swarm node listening on http://{}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
+
+async fn handler(Json(payload): Json<AccumulateRequest>, ek: PublicKey) -> Json<AccumulateResponse> {
+    let mut acc = Paillier::encrypt(&ek, BigInt::from(0));
+
+    for entry in payload.inputs {
+        let ct_bytes = decode(&entry.ciphertext).expect("Invalid base64");
+        let ct = BigInt::from_bytes_be(&ct_bytes);
+        let weight = BigInt::from_f64(entry.weight).expect("Bad float");
+        let weighted = Paillier::mul(&ek, weight, ct);
+        acc = Paillier::add(&ek, acc, weighted);
+    }
+
+    let response = AccumulateResponse {
+        result: encode(acc.to_bytes_be()),
+    };
+
+    Json(response)
+}
+
+⸻
+
+Run the Swarm Node
+
+cargo run
+
+Live JSON-RPC endpoint at:
+
+POST http://localhost:3000/accumulate
+Content-Type: application/json
+
+⸻
+
+Example Request JSON
+
+{
+  "inputs": [
+    { "ciphertext": "BASE64_ENC_X1", "weight": 3.0 },
+    { "ciphertext": "BASE64_ENC_X2", "weight": 5.0 }
+  ]
+}
