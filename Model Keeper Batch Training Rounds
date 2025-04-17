@@ -1,0 +1,96 @@
+Instead of submitting individual weight updates, the Model Keeper computes and submits a full matrix of updated weights, signed and hashed as a whole.
+
+This:
+	•	Improves integrity and auditability
+	•	Simplifies synchronization across swarm and client nodes
+	•	Allows for one signature per round (instead of per-weight)
+
+⸻
+
+Updated ENS Training Round Protocol (with Batch Commit)
+
+⸻
+
+Round Initialization
+	The Model Keeper:
+	•	Loads the current model weights
+	•	Fetches previous state hash (optional verification)
+
+⸻
+
+Encrypt + Dispatch to Swarm
+
+For each training sample (or minibatch):
+	•	Encrypt inputs: Enc(x1), Enc(x2), ..., Enc(xN)
+	•	Pair with weights: w1, w2, ..., wN
+	•	Dispatch AccumulateRequest to one or more swarm nodes
+	•	Receive: encrypted partials or full result (Enc(w·x))
+
+Repeat for B batches.
+
+⸻
+
+3. Aggregate + Train
+	•	Decrypt each accumulated result
+	•	Apply updates via SGD or optimizer of choice
+	•	After all B batches, produce full updated model:
+
+let updated_weights: BTreeMap<String, f64>
+
+
+
+⸻
+
+4. Compute and Sign State Hash
+
+Use existing helper:
+
+let state_hash = compute_model_hash(&updated_weights);
+
+Create a digital signature over the hash using your keypair:
+
+let sig = sign(&state_hash); // Ed25519 or other scheme
+
+
+
+⸻
+
+5. Submit Batch Update to Blockchain
+
+Payload:
+
+{
+  "model_id": "ens-model-001",
+  "version": 9,
+  "state_hash": "abc123...",
+  "updated_at": "2025-04-17T01:23:45Z",
+  "weights": {
+    "1:0": 0.027,
+    "1:1": 0.142,
+    ...
+  },
+  "author": "<base64 public key>",
+  "signature": "<base64(sig(state_hash))>"
+}
+
+Sent to:
+	•	/submit-batch REST endpoint or
+	•	New transaction type in the Tendermint ABCI app
+
+⸻
+
+ABCI-side verification:
+	•	Recompute state hash from submitted weights
+	•	Compare against state_hash in payload
+	•	Verify signature using author public key
+	•	Accept the block if hash and signature are valid
+
+⸻
+
+Benefits of Batch-Based Rounds
+
+Benefit	Explanation
+Fewer transactions	One per round vs. one per weight
+Stronger integrity	Full matrix signature & hash
+Better for multi-node sync	Everyone sees the same state
+Efficient on-chain storage	Commit just hash + metadata (weights optional)
