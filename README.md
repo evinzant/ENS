@@ -77,9 +77,9 @@ Use Case: Secure Joint Intelligence Analysis
 	•	Function: Each agency provides encrypted features; ENS processes and returns results securely.
 	•	Value: Collaboration without compromising classified datasets or exposing inter-agency logic.
 
- Routing and Switching
-
- Use Case: Privacy-Preserving Network Routing with ENS
+  Routing and Switching
+  
+Use Case: Privacy-Preserving Network Routing with ENS
 	•	Scenario: 
  	Each network node has local information (e.g., bandwidth, latency, congestion)
   	This information is encrypted using a shared Paillier public key
