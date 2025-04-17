@@ -1,0 +1,178 @@
+These functions are where the app:
+	•	Validates incoming transactions
+	•	Applies valid transactions to the model state
+	•	Ensures integrity, signatures, and structure
+
+How to implement using both WeightUpdate struct and a simple in-memory store (can persist later).
+
+⸻
+
+1. Deserialize and Validate the Transaction (JSON)
+
+Update check_tx in main.rs:
+
+use crate::types::{ENSTransaction, WeightUpdate};
+
+async fn check_tx(&self, req: RequestCheckTx) -> ResponseCheckTx {
+    let tx_bytes = req.tx;
+
+    // Convert bytes to JSON string
+    let tx_str = match std::str::from_utf8(&tx_bytes) {
+        Ok(s) => s,
+        Err(_) => {
+            return ResponseCheckTx {
+                code: 1,
+                log: "Invalid UTF-8 in transaction".to_string(),
+                ..Default::default()
+            };
+        }
+    };
+
+    // Deserialize JSON into ENS transaction
+    let parsed: ENSTransaction = match serde_json::from_str(tx_str) {
+        Ok(p) => p,
+        Err(_) => {
+            return ResponseCheckTx {
+                code: 2,
+                log: "Failed to parse transaction JSON".to_string(),
+                ..Default::default()
+            };
+        }
+    };
+
+    // Verify signature (only for WeightUpdate right now)
+    if let ENSTransaction::WeightUpdate(update) = parsed {
+        if !update.verify_signature() {
+            return ResponseCheckTx {
+                code: 3,
+                log: "Invalid signature".to_string(),
+                ..Default::default()
+            };
+        }
+    }
+
+    ResponseCheckTx {
+        code: 0,
+        log: "Transaction valid".to_string(),
+        ..Default::default()
+    }
+}
+
+
+
+⸻
+
+2. Apply the Transaction in deliver_tx
+
+Does the same JSON parsing, simulates applying to a model state store (could be in memory for now).
+
+use std::sync::Mutex;
+use crate::types::ModelState;
+
+lazy_static::lazy_static! {
+    static ref MODEL_STATE: Mutex<ModelState> = Mutex::new(ModelState::new());
+}
+
+async fn deliver_tx(&self, req: RequestDeliverTx) -> ResponseDeliverTx {
+    let tx_bytes = req.tx;
+
+    let tx_str = match std::str::from_utf8(&tx_bytes) {
+        Ok(s) => s,
+        Err(_) => {
+            return ResponseDeliverTx {
+                code: 1,
+                log: "Invalid UTF-8".to_string(),
+                ..Default::default()
+            };
+        }
+    };
+
+    let parsed: ENSTransaction = match serde_json::from_str(tx_str) {
+        Ok(p) => p,
+        Err(_) => {
+            return ResponseDeliverTx {
+                code: 2,
+                log: "Failed to parse JSON".to_string(),
+                ..Default::default()
+            };
+        }
+    };
+
+    if let ENSTransaction::WeightUpdate(update) = parsed {
+        if !update.verify_signature() {
+            return ResponseDeliverTx {
+                code: 3,
+                log: "Invalid signature".to_string(),
+                ..Default::default()
+            };
+        }
+
+        // Apply update to model state
+        let mut model = MODEL_STATE.lock().unwrap();
+        model.apply_weight_update(update);
+    }
+
+    ResponseDeliverTx {
+        code: 0,
+        log: "Transaction applied".to_string(),
+        ..Default::default()
+    }
+}
+
+
+
+⸻
+
+3. Implement verify_signature and ModelState in types.rs
+
+Example Signature Check (Ed25519):
+
+use ed25519_dalek::{PublicKey, Signature, Verifier};
+use base64::{decode};
+
+impl WeightUpdate {
+    pub fn verify_signature(&self) -> bool {
+        let public_key_bytes = match decode(&self.author) {
+            Ok(bytes) => bytes,
+            Err(_) => return false,
+        };
+
+        let sig_bytes = match decode(&self.signature) {
+            Ok(bytes) => bytes,
+            Err(_) => return false,
+        };
+
+        let public_key = match PublicKey::from_bytes(&public_key_bytes) {
+            Ok(pk) => pk,
+            Err(_) => return false,
+        };
+
+        let signature = match Signature::from_bytes(&sig_bytes) {
+            Ok(sig) => sig,
+            Err(_) => return false,
+        };
+
+        public_key.verify(&self.signing_bytes(), &signature).is_ok()
+    }
+}
+
+Simple ModelState to Track Latest Weights
+
+use std::collections::HashMap;
+
+pub struct ModelState {
+    pub weights: HashMap<(u32, u32), f64>, // (layer, neuron) => weight
+}
+
+impl ModelState {
+    pub fn new() -> Self {
+        Self {
+            weights: HashMap::new(),
+        }
+    }
+
+    pub fn apply_weight_update(&mut self, update: WeightUpdate) {
+        let key = (update.layer, update.neuron);
+        self.weights.insert(key, update.new_weight);
+    }
+}
