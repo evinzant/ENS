@@ -1,0 +1,106 @@
+Encryption Layer Overview
+
+Goals:
+	•	Encrypt user input (before it’s sent to swarm nodes)
+	•	Enable nodes to compute over encrypted data without decrypting it
+	•	Allow only trusted entities (e.g., the client) to decrypt final results
+	•	Ensure all keys and operations are tied to cryptographic identities
+
+⸻
+
+Main Components
+
+Component	               Responsibility
+Key Management	         Generate, store, and distribute encryption keys
+Paillier Encryption	     Encrypt inputs, perform operations on ciphertexts
+Decryption Authority	   Node or client that can decrypt final outputs
+Homomorphic Operations	 Perform addition and scalar multiplication securely
+
+⸻
+
+Key Management
+
+Use Paillier encryption:
+	•	Asymmetric
+	•	Additively homomorphic
+	•	Supports Enc(x₁) + Enc(x₂) = Enc(x₁ + x₂)
+	•	Supports Enc(x)^k = Enc(k·x) (scalar multiplication)
+
+Generate a Paillier Keypair
+
+Use an existing Rust Paillier lib like paillier or paillier-rust.
+
+Each ENS session/model instance has a:
+	•	Public key: shared with all nodes
+	•	Private key: held by the client or a trusted aggregator
+
+Generate at model deployment:
+
+use paillier::*;
+
+// Generate 2048-bit Paillier keypair
+let (ek, dk) = Paillier::keypair().keys();
+
+Public Key Distribution
+	•	Swarm nodes receive only the public key (ek)
+	•	Only the client retains dk for final decryption
+
+Optionally encode the public key into a “model descriptor” on-chain or off-chain.
+
+⸻
+
+Encryption / Decryption Flow
+
+Encrypt Inputs
+
+On the client before sending:
+
+let input_value: BigInt = 42.into();
+let encrypted = Paillier::encrypt(&ek, input_value);
+
+Then send encrypted number to a swarm node in a request.
+
+Swarm Nodes Perform Homomorphic Operations
+
+Swarm node receives:
+	•	Enc(x)
+	•	w (known weight)
+
+Performs:
+
+let weighted = Paillier::add(
+    &ek,
+    Paillier::encrypt(&ek, BigInt::zero()),     // accumulator start
+    Paillier::mul(&ek, w.into(), encrypted)
+);
+
+Return Result to Decryption Authority
+
+After accumulation:
+
+let result = weighted; // still encrypted
+
+Return to client:
+
+let decrypted: BigInt = Paillier::decrypt(&dk, result);
+
+⸻
+
+Key Handling Considerations
+
+Per-model keys vs Global keys:
+	•	Per-model keys improve security (compartmentalized)
+	•	Global key is simpler to manage across multiple users/models
+
+Key Sharing Format:
+
+Serialize ek (the public key) using the serde features of the Paillier lib or export components (n for modulus) manually.
+
+⸻
+
+Step 4: Practical Recommendations
+
+Role	      Stores	              Encrypts	Decrypts	Computes
+Client	    Public & private key	Yes	      Yes	      Optional
+Swarm Node	Public key only	      No	      No	      Yes
+Aggregator	Optional private key	Maybe	    Yes	      Maybe
