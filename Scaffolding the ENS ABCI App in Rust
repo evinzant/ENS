@@ -1,0 +1,81 @@
+cargo new ens_abci
+cd ens_abci
+
+[dependencies]
+abci = "0.10"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+ed25519-dalek = "1.0"
+base64 = "0.21"
+
+//Basic ABCI App Skeleton – main.rs
+//A minimal structure to get the app up and responding to Tendermint.
+
+use abci::*;
+use async_trait::async_trait;
+use tokio;
+
+mod types; // We'll define our WeightUpdate struct here
+
+struct ENSApp;
+
+#[async_trait]
+impl Application for ENSApp {
+    async fn info(&self, _req: RequestInfo) -> ResponseInfo {
+        ResponseInfo {
+            data: "ENS Blockchain App".to_string(),
+            version: "0.1.0".to_string(),
+            app_version: 1,
+            last_block_height: 0,
+            last_block_app_hash: vec![],
+        }
+    }
+
+    async fn check_tx(&self, req: RequestCheckTx) -> ResponseCheckTx {
+        // Later: Verify transaction signature and structure
+        ResponseCheckTx {
+            code: 0, // 0 = success
+            log: "Transaction accepted".to_string(),
+            ..Default::default()
+        }
+    }
+
+    async fn deliver_tx(&self, req: RequestDeliverTx) -> ResponseDeliverTx {
+        // Later: Deserialize and apply the transaction to model state
+        println!("Received tx: {:?}", req.tx);
+        ResponseDeliverTx {
+            code: 0,
+            log: "Transaction applied".to_string(),
+            ..Default::default()
+        }
+    }
+
+    async fn commit(&self) -> ResponseCommit {
+        // Return the app hash (model state hash, later)
+        ResponseCommit {
+            data: vec![0u8; 32], // dummy hash for now
+            retain_height: 0,
+        }
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    println!("Starting ENS ABCI app...");
+    abci::run_local(ENSApp).await;
+}
+
+//EOF
+
+NOTES:
+Create the types.rs File
+Define WeightUpdate and ENSTransaction structs here, as was done earlier.
+
+
+Build & Run
+
+
+App will be listening for Tendermint on port 26658 by default
