@@ -1,0 +1,26 @@
+1. weight_update
+	•	When a model weight is updated (training or optimization)
+	•	Includes model ID, layer, neuron index, old/new weights
+
+2. model_commit
+	•	Commits a new model architecture (optional)
+	•	Includes model ID, structure hash, author, timestamp
+
+3. output_commit (future)
+	•	Swarm node reports encrypted output of a forward pass
+	•	Used for zero-knowledge or traceability of inference
+
+Sample weight_update Transaction Structure:
+
+{
+  "type": "weight_update",
+  "model_id": "ens-model-001",
+  "layer": 1,
+  "neuron": 4,
+  "old_weight": 0.128,
+  "new_weight": 0.131,
+  "update_reason": "gradient_descent",
+  "timestamp": "2025-04-16T21:00:00Z",
+  "author": "node_01_pubkey",
+  "signature": "base64sig=="
+}
