@@ -1,0 +1,100 @@
+Build a lightweight compute module that:
+	•	Loads the public key from public_key.json
+	•	Receives encrypted inputs
+	•	Applies homomorphic scalar multiplication using plaintext weights
+	•	Adds multiple encrypted terms together (accumulation)
+	•	Returns the encrypted result
+
+This can be exposed over HTTP or RPC later
+
+⸻
+
+Dependencies
+
+In Cargo.toml for the swarm node app:
+
+[dependencies]
+paillier = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.21"
+num-bigint = "0.4"
+
+⸻
+
+Load Public Key from public_key.json
+
+use paillier::*;
+use paillier::encoding::BigInt;
+use serde::{Deserialize};
+use base64::decode;
+use std::fs;
+
+#[derive(Deserialize)]
+struct PublicKeyImport {
+    n: String,
+}
+
+fn load_public_key(path: &str) -> PublicKey {
+    let json = fs::read_to_string(path).expect("Failed to read public_key.json");
+    let key: PublicKeyImport = serde_json::from_str(&json).expect("Invalid JSON");
+
+    let n_bytes = decode(&key.n).expect("Invalid base64");
+    let n = BigInt::from_bytes_be(&n_bytes);
+
+    PublicKey { n }
+}
+
+⸻
+
+Homomorphic Weighted Sum Function
+
+fn accumulate_encrypted_inputs(
+    ek: &PublicKey,
+    encrypted_inputs: Vec<(BigInt, f64)>
+) -> BigInt {
+    let mut acc = Paillier::encrypt(ek, BigInt::from(0)); // Start with Enc(0)
+
+    for (ciphertext, weight) in encrypted_inputs {
+        let weight_int = BigInt::from_f64(weight).expect("Non-finite weight");
+        let weighted = Paillier::mul(ek, weight_int, ciphertext);
+        acc = Paillier::add(ek, acc, weighted);
+    }
+
+    acc
+}
+
+Each tuple in encrypted_inputs is:
+	•	ciphertext: input value encrypted with Paillier
+	•	weight: plaintext weight for that input
+
+This allows the swarm node to compute:
+
+Enc(w₁·x₁ + w₂·x₂ + ...) = Enc(w₁·x₁) + Enc(w₂·x₂) + ...
+
+⸻
+
+Simulated Input + Full Example
+
+fn main() {
+    let ek = load_public_key("public_key.json");
+
+    // Simulate encrypted inputs
+    let x1 = Paillier::encrypt(&ek, BigInt::from(7));  // input: 7
+    let x2 = Paillier::encrypt(&ek, BigInt::from(4));  // input: 4
+
+    // Assign weights (plaintext)
+    let inputs = vec![
+        (x1, 3.0),  // w₁ = 3
+        (x2, 5.0),  // w₂ = 5
+    ];
+
+    // Accumulate encrypted weighted sum
+    let result = accumulate_encrypted_inputs(&ek, inputs);
+
+    // Output base64-encoded ciphertext
+    let result_bytes = result.to_bytes_be();
+    let result_b64 = base64::encode(result_bytes);
+
+    println!("Encrypted result (base64): {}", result_b64);
+}
