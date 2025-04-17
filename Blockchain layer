@@ -1,0 +1,30 @@
+Blockchain Layer: Responsibilities in ENS
+
+Function	             Description
+Store weight updates	 Every model update (e.g., SGD step) becomes a block/transaction
+Timestamp events	     Establish clear order of training events
+Verify authorship	     Ensure nodes are signed and identifiable
+Distribute state	     Let new swarm nodes catch up on current model version
+Optional voting	       Enable consensus (e.g., for multi-party agreement on updates)
+
+simplified blockchain-like system using:
+	•	Merkle tree or Merkle DAG to track model weight updates
+	•	Ed25519 signatures to verify authorship of updates
+	•	Local hash chaining or light consensus mechanism (e.g., simple majority)
+	•	IPFS-style broadcasting for peer sync
+	•	Flat files or JSON logs for ultra-simple proof-of-concept
+
+Why:
+	•	Fits well on low-power devices
+	•	Easy to inspect and simulate
+	•	Lets us prototype fast
+	•	Replace it later with Fabric or Cosmos once the protocol solidifies
+
+Blockchain Layer Responsibilities for ENS v1:
+
+Feature	              How to implement
+Append-only ledger	  Simple JSON log or file with hash pointers
+Authorship	          All updates signed with node’s private key
+Verification	        Peers check signatures + hash chain
+State sync	          Nodes pull latest chain on join
+Consensus (optional)	Start with no consensus (manual trust); add voting later
