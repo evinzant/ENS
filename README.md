@@ -86,8 +86,7 @@ Use Case: Privacy-Preserving Network Routing with ENS
    	Nodes send encrypted metrics to a swarm node (or set of swarm nodes)
     	The swarm performs homomorphic accumulation and comparisons
      	The result helps compute the best next hop, optimal path, or route weights — without any node revealing its actual metrics
-      
-        •	Function:
+      	•	Function:
   	Node A wants to forward a packet
         It sends:
 		A request to swarm: “Which neighbor (B, C, D) has best current cost to destination?” along with encrypted costs Enc(cost_B), Enc(cost_C), Enc(cost_D)
@@ -95,8 +94,7 @@ Use Case: Privacy-Preserving Network Routing with ENS
 		Could apply pre-trained models or aggregate encrypted cost values from multiple hops
         Swarm returns encrypted ranking or recommendation
 	Node A decrypts and selects the best path
- 
-        •	Value:
+ 	•	Value:
 	Network privacy	 is maintained because costs and paths stay encrypted, there is no central visibility.
         Decentralized path selection because multiple swarm nodes can evaluate options independently.
 	Zero trust compliant because nodes don’t need to trust neighbors with raw state.
