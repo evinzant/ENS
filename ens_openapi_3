@@ -1,0 +1,216 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ENS Node API",
+    "version": "1.0.0",
+    "description": "OpenAPI specification for Encrypted Neural Swarm (ENS) endpoints"
+  },
+  "paths": {
+    "/accumulate": {
+      "post": {
+        "summary": "Perform homomorphic weighted accumulation on encrypted inputs",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccumulateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Encrypted accumulated result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccumulateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submit-update": {
+      "post": {
+        "summary": "Submit signed model weight update to the blockchain",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeightUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update accepted"
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "summary": "Get status and public identity of this node",
+        "responses": {
+          "200": {
+            "description": "Node status information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccumulateRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AccumulateRequest",
+        "type": "object",
+        "properties": {
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ciphertext": {
+                  "type": "string"
+                },
+                "weight": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "ciphertext",
+                "weight"
+              ]
+            }
+          }
+        },
+        "required": [
+          "inputs"
+        ]
+      },
+      "AccumulateResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AccumulateResponse",
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ]
+      },
+      "WeightUpdateRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "WeightUpdateRequest",
+        "type": "object",
+        "properties": {
+          "model_id": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "integer"
+          },
+          "neuron": {
+            "type": "integer"
+          },
+          "old_weight": {
+            "type": "number"
+          },
+          "new_weight": {
+            "type": "number"
+          },
+          "update_reason": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "author": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id",
+          "layer",
+          "neuron",
+          "old_weight",
+          "new_weight",
+          "update_reason",
+          "timestamp",
+          "author",
+          "signature"
+        ]
+      },
+      "StatusResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "StatusResponse",
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "enum": [
+              "swarm",
+              "client",
+              "model_keeper",
+              "blockchain"
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "public_key_fingerprint": {
+            "type": "string"
+          },
+          "model_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "version",
+          "public_key_fingerprint",
+          "model_id"
+        ]
+      },
+      "ENSError": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "ENSError",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "integer"
+          },
+          "hint": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "code"
+        ]
+      }
+    }
+  }
+}
