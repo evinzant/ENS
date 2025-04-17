@@ -1,0 +1,18 @@
+Each block in the ENS chain represents a batch of model weight updates and metadata:
+
+Transaction Format Example:
+
+{
+  "type": "weight_update",
+  "model_id": "ENS-001",
+  "layer": 2,
+  "neuron": 5,
+  "old_weight": 0.023,
+  "new_weight": 0.026,
+  "update_reason": "gradient_step",
+  "timestamp": "2025-04-16T23:59:59Z",
+  "author": "node_12_pubkey",
+  "signature": "base64-enc-sig"
+}
+
+This is just one transaction — many can be grouped per block.
