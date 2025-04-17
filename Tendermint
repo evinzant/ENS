@@ -10,3 +10,26 @@ What is built on top:
 	•	Transactions are validated and accepted into the chain
 	•	Nodes query the current model state
 	•	The system syncs model state across the swarm
+
+1. ENS Application (ABCI app)
+
+Tendermint uses ABCI (Application Blockchain Interface) to separate consensus from logic.
+
+Simple ENS app that:
+	•	Accepts and validates incoming transactions
+	•	Stores them in memory or lightweight DB (e.g., LevelDB)
+	•	Responds to Tendermint with status updates
+
+2. Lite Node Option
+
+Swarm devices (i.e. IoT devices, Raspberry Pis) can:
+	•	Run a Tendermint lite client (follow-only, no consensus role)
+	•	Or periodically pull state snapshots from a full node
+	•	Sign transactions and submit them when they propose updates or log outputs
+
+3. Signing & Identity
+
+Every participating node needs:
+	•	A public/private keypair
+	•	To sign its model updates
+	•	The system to verify authenticity and prevent rogue weight changes
