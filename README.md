@@ -5,7 +5,7 @@ I want to make my licensing intentions clear as everything that follows modifies
 
 This IS NOT going to be effective with LLM's. This system is designed for significantly less data than the size of LLM's. I don't have a max size because it dependant on SO many variables. I will instead provide use cases that this system will work with.
 
-This is not an "install it and it will run," type of project. It's about a 90% solution. It will take some work on your part to make the system work. What did you expect for "free as in beer?"
+This is not an "install it and it will run," type of project. It's about a 90% solution. It will take some work on your part to make the system work.
 
 If you have questions you can contact me. My gmail account is kd5jos@gmail.com. No, I won't rewrite something for YOUR specific needs. I'm posting this to demonstrate what 15 months of unemployment has me creating. Take this code and improve on it.
 
