@@ -1,7 +1,7 @@
 # ENS
 Encrypted Neural Swarm
 
-I want to make my licensing intentions clear. I want credit for my work. If you use my work, credit me. If you make changes to this and something is the basis of my work, credit me. If you want to use this in your business, fine. What you can not do is sell my work. You CAN sell YOUR work that is compatible with my work. If you improve something in what I have done, you agree to make the code available. You can sell your code, but it has to be Open Source.
+I want to make my licensing intentions clear. I want credit for my work. If you use my work, credit me. If you make changes to this and something is the basis of my work, credit me. If you want to use this in your business, fine. What you can not do is sell my work. You CAN sell YOUR work that is compatible with my work. If you improve something in what I have done, you agree to make the code available Open Source. If you want to use this in a product for sale or state/national defense, contact me for a licensing arrangement.
 
 This IS NOT going to be effective with LLM's. This system is designed for significantly less data than the size of LLM's. I don't have a max size because it dependant on SO many variables. I will instead provide use cases that this system will work with.
 
