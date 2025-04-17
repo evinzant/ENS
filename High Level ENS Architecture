@@ -1,0 +1,23 @@
++-------------------------------+
+|    Tendermint Core (BFT)     |
+|  - Block proposal & voting   |
+|  - Peer gossiping            |
+|  - Finality / consensus      |
++-------------------------------+
+              |
+              v
++-------------------------------+
+|     ENS Application Logic     |
+|  - Transaction format         |
+|  - Model weight updates       |
+|  - Signature validation       |
+|  - State sync (model state)   |
++-------------------------------+
+              |
+              v
++-------------------------------+
+|   Lightweight Pi Node Stack   |
+|  - Fetch chain state          |
+|  - Perform Paillier math      |
+|  - Submit encrypted results   |
++-------------------------------+
