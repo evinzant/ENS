@@ -71,11 +71,11 @@ Use Case: Encrypted AI Oracle
 	•	Value: On-chain systems access powerful AI without ever touching sensitive input or model data.
 
  Defense and National Security
-
+ 
 Use Case: Secure Joint Intelligence Analysis
-	•	Scenario: Multiple agencies collaborate to analyze satellite or sensor data.
-	•	Function: Each agency provides encrypted features; ENS processes and returns results securely.
-	•	Value: Collaboration without compromising classified datasets or exposing inter-agency logic.
+ 	•	Scenario: Multiple agencies collaborate to analyze satellite or sensor data.
+  	•	Function: Each agency provides encrypted features; ENS processes and returns results securely.
+   	•	Value: Collaboration without compromising classified datasets or exposing inter-agency logic.
 
   Routing and Switching
   
