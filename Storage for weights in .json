@@ -1,0 +1,40 @@
+use std::{collections::BTreeMap, fs};
+use serde::{Serialize, Deserialize};
+
+pub type WeightsMap = BTreeMap<String, f64>;
+
+/// Load weights from a JSON file (weights.json)
+pub fn load_weights_from_json(path: &str) -> WeightsMap {
+    let json = fs::read_to_string(path).expect("Failed to read weights.json");
+    serde_json::from_str(&json).expect("Invalid JSON format for weights")
+}
+
+/// Save weights to a JSON file (weights.json)
+pub fn save_weights_to_json(path: &str, weights: &WeightsMap) {
+    let json = serde_json::to_string_pretty(weights).expect("Failed to serialize weights");
+    fs::write(path, json).expect("Failed to write weights.json");
+}
+
+/// Example usage
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_roundtrip_json_weights() {
+        let mut weights = WeightsMap::new();
+        weights.insert("1:0".to_string(), 0.1);
+        weights.insert("1:1".to_string(), 0.2);
+        weights.insert("2:0".to_string(), 0.3);
+
+        save_weights_to_json("test_weights.json", &weights);
+        let loaded = load_weights_from_json("test_weights.json");
+
+        assert_eq!(weights, loaded);
+    }
+}
+
+Features:
+	•	Loads weights from a weights.json file into a BTreeMap<String, f64>
+	•	Saves any weight map back to the same file
+	•	Fully compatible with the batch signing and submission flow
