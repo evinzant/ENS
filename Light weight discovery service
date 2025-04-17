@@ -1,0 +1,218 @@
+Plan
+	•	Register active swarm nodes
+	•	Serve a list of available compute nodes to clients
+	•	Optionally includes public keys, model IDs, and status info
+
+Rust + Axum.
+
+⸻
+
+Endpoints:
+	1.	GET /swarm-nodes – Returns a list of registered nodes
+	2.	POST /register – Swarm node self-registers with metadata
+	3.	GET /status – Healthcheck
+
+Swarm Node Metadata Format:
+
+{
+  "url": "https://node1.ens.local:3000",
+  "model_id": "ens-model-001",
+  "public_key_fingerprint": "abc123",
+  "registered_at": "2025-04-17T00:00:00Z"
+}
+
+use axum::{
+    extract::State,
+    routing::{get, post},
+    Json, Router,
+};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{Arc, RwLock},
+};
+use chrono::{Utc, DateTime};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct SwarmNodeInfo {
+    url: String,
+    model_id: String,
+    public_key_fingerprint: String,
+    registered_at: DateTime<Utc>,
+}
+
+type SharedRegistry = Arc<RwLock<HashMap<String, SwarmNodeInfo>>>;
+
+#[tokio::main]
+async fn main() {
+    let registry: SharedRegistry = Arc::new(RwLock::new(HashMap::new()));
+
+    let app = Router::new()
+        .route("/swarm-nodes", get(get_nodes))
+        .route("/register", post(register_node))
+        .route("/status", get(status))
+        .with_state(registry);
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    println!("Discovery service listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
+
+async fn get_nodes(State(registry): State<SharedRegistry>) -> Json<Vec<SwarmNodeInfo>> {
+    let map = registry.read().unwrap();
+    let list = map.values().cloned().collect();
+    Json(list)
+}
+
+#[derive(Debug, Deserialize)]
+struct RegisterRequest {
+    url: String,
+    model_id: String,
+    public_key_fingerprint: String,
+}
+
+async fn register_node(
+    State(registry): State<SharedRegistry>,
+    Json(payload): Json<RegisterRequest>,
+) -> Json<&'static str> {
+    let info = SwarmNodeInfo {
+        url: payload.url.clone(),
+        model_id: payload.model_id,
+        public_key_fingerprint: payload.public_key_fingerprint,
+        registered_at: Utc::now(),
+    };
+
+    registry.write().unwrap().insert(payload.url, info);
+    Json("Node registered")
+}
+
+async fn status() -> Json<&'static str> {
+    Json("Discovery service OK")
+}
+
+
+⸻
+
+Create a new Rust project:
+
+cargo new ens_discovery
+cd ens_discovery
+
+	Add dependencies to Cargo.toml:
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+
+
+Run the service
+
+⸻
+
+Test Example: Register a Node
+
+curl -X POST http://localhost:8080/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://swarm1.local:3000",
+    "model_id": "ens-model-001",
+    "public_key_fingerprint": "abc123def456"
+}'
+
+List Registered Nodes
+
+curl http://localhost:8080/swarm-nodes
+
+
+
+⸻
+State Hash Verification
+
+This is critical for:
+	•	Detecting tampering or stale state
+	•	Achieving distributed consensus about a model’s parameters
+	•	Allowing zero-trust nodes to verify integrity without access to decrypted weights
+
+⸻
+
+ENS State Hash Verification – Design Overview
+
+Hash the model weights (or a digest of them) and store the hash on-chain. Any node can:
+	1.	Recompute the hash from their local model weights
+	2.	Compare it against the on-chain hash
+	3.	Decide whether their view of the model is valid
+
+⸻
+
+Hashing Strategy
+
+Input:
+
+{
+  "1:0": 0.028,
+  "1:1": 0.137,
+  ...
+}
+
+Steps:
+	•	Sort weights by layer:neuron key
+	•	Serialize to canonical JSON or binary format
+	•	Compute SHA-256 hash of serialized output
+
+Rust Example:
+
+use sha2::{Sha256, Digest};
+use serde_json::to_string;
+
+fn compute_model_hash(weights: &BTreeMap<String, f64>) -> String {
+    let json = to_string(&weights).unwrap(); // sorted by BTreeMap
+    let hash = Sha256::digest(json.as_bytes());
+    hex::encode(hash)
+}
+
+BTreeMap ensures deterministic ordering, so hashes are consistent across machines.
+
+⸻
+
+Storing the Hash On-Chain
+
+When a model update is submitted:
+	•	Include the new weight map
+	•	Compute the state hash
+	•	Store it in the transaction (or block metadata)
+
+Example Extension to WeightUpdateRequest:
+
+{
+  "model_id": "ens-model-001",
+  "state_hash": "abc123...",
+  ...
+}
+
+In ABCI deliver_tx:
+	•	Recompute the hash from state
+	•	Compare it to submitted state_hash
+	•	Accept or reject the update
+
+⸻
+
+Verifying State on Client or Swarm
+
+Any node can:
+	1.	Query weights:
+
+GET /model/ens-model-001
+→ returns { weights: { "1:0": 0.028, ... }, hash: "abc123..." }
+
+
+	2.	Recompute the hash locally
+	3.	Compare against returned hash
+
+let valid = compute_model_hash(&fetched_weights) == fetched_hash;
