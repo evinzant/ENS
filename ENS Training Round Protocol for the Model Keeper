@@ -1,0 +1,86 @@
+The Model Keeper coordinates training across potentially untrusted, stateless swarm nodes. It holds the model weights and handles:
+	1.	Round start
+	2.	Input collection
+	3.	Encrypted compute dispatch
+	4.	Result aggregation
+	5.	Weight update
+	6.	State hash verification
+	7.	Blockchain submission
+
+⸻
+
+Roles Involved
+
+Role	           Responsibilities
+Model Keeper	   Holds model weights, coordinates training, submits updates
+Swarm Nodes	     Perform encrypted computation (e.g. Enc(x) * w)
+Clients	         Optionally provide inputs or act as passive verifiers
+
+⸻
+
+Step-by-Step Protocol Flow
+
+Round Start
+	•	Model Keeper selects a batch of training data (or receives it)
+	•	Fetches latest model weights from local DB or blockchain
+
+let model = load_model("ens-model-001");
+
+⸻
+
+Input Collection
+	•	For each training sample:
+	•	Extract feature vector x
+	•	Encrypt inputs using public key
+	•	Pair with corresponding weights w
+
+⸻
+
+Dispatch to Swarm
+	•	Prepare AccumulateRequest with:
+
+{
+  "inputs": [
+    { "ciphertext": "base64(Enc(x1))", "weight": w1 },
+    ...
+  ]
+}
+
+
+	•	POST to /accumulate endpoint of 1+ swarm nodes
+	•	Receive encrypted result Enc(w·x)
+
+⸻
+
+Result Aggregation
+	•	If using multiple swarm nodes:
+	•	Aggregate encrypted responses (add Paillier ciphertexts)
+	•	Or decrypt individually and average results
+
+⸻
+
+Weight Update
+	•	Decrypt aggregated result using private key
+	•	Apply update rule (e.g., SGD):
+
+w_new = w_old - learning_rate * gradient
+
+
+	•	Update local model weights in memory or DB
+
+⸻
+
+State Hash Computation
+	•	Compute canonical hash of model state:
+
+let state_hash = compute_model_hash(&model.weights);
+
+⸻
+
+Submit Weight Update to Blockchain
+	•	Build signed WeightUpdateRequest
+	•	POST to:
+	•	/submit-update endpoint (model keeper REST)
+	•	Or Tendermint transaction (ABCI client)
+
+Each update includes model ID, layer, neuron, old/new weight, reason, timestamp, signature, and state_hash.
