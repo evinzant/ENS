@@ -1,0 +1,97 @@
+When a new transaction is submitted:
+	1.	Verify Signature
+	•	Confirm the author is known and the signature is valid
+	2.	Check Model ID
+	•	Make sure this model exists (or allow implicit creation)
+	3.	Validate Weights
+	•	Ensure weights are floats (or quantized ints), within acceptable range
+	4.	Store Update
+	•	Append to transaction log
+	•	Update current in-memory model state
+	5.	Broadcast Result
+	•	Allow nodes to fetch updated model weights if needed
+
+These structs will represent the transactions the0 ENS blockchain handles — starting with the weight_update, and later possibly model_commit and output_commit.
+
+Rust Structs for ENS Blockchain Transactions
+
+Rust data structures will be:
+	•	Serializable (using serde)
+	•	Hashable (for inclusion in Merkle chains)
+	•	Signable (so we can verify authorship)
+	•	Lightweight and portable
+
+Core Dependencies (in Cargo.toml)
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+ed25519-dalek = "1.0"
+sha2 = "0.10"
+chrono = { version = "0.4", features = ["serde"] }
+
+⸻
+
+1. WeightUpdate Struct
+
+use serde::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WeightUpdate {
+    pub model_id: String,
+    pub layer: u32,
+    pub neuron: u32,
+    pub old_weight: f64,
+    pub new_weight: f64,
+    pub update_reason: String,
+    pub timestamp: DateTime<Utc>,
+    pub author: String,        // base64 or hex of public key
+    pub signature: String      // base64 or hex-encoded digital signature
+}
+
+⸻
+
+2. Enum for Transaction Types (Future-Proofing)
+
+Will eventually support other transaction types like model_commit.
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum ENSTransaction {
+    WeightUpdate(WeightUpdate),
+    // ModelCommit(ModelCommit),     // Add later
+    // OutputCommit(OutputCommit),   // Add later
+}
+
+⸻
+
+3. Transaction Signing Digest
+
+Need a canonical hash of the transaction contents without the signature for signing/verification:
+
+use sha2::{Sha256, Digest};
+
+impl WeightUpdate {
+    pub fn signing_bytes(&self) -> Vec<u8> {
+        let mut clone = self.clone();
+        clone.signature = String::new(); // Remove the signature field
+        serde_json::to_vec(&clone).expect("Serialization failed")
+    }
+
+    pub fn hash(&self) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+        hasher.update(self.signing_bytes());
+        hasher.finalize().to_vec()
+    }
+}
+
+Maybe later use ed25519-dalek to sign and verify this digest?
+
+⸻
+
+Storage Format
+
+Store transactions either as:
+	•	Flat JSON lines, one per transaction (simple and inspectable), or
+	•	Merkle-chain entries in a RocksDB/LevelDB-like system (for v2)
