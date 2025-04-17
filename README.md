@@ -12,6 +12,18 @@ If you have questions you can contact me. My gmail account is kd5jos@gmail.com. 
 With all that said, what exactly is an Encrypted Neural Swarm?
 ENS provides a privacy-preserving, decentralized, and auditable system for neural network inference and training by combining homomorphic encryption with blockchain-based model state tracking, enabling distributed, fault-tolerant AI computation across untrusted nodes.
 
+What makes this idea unique:
+	•	Use of Paillier (not FHE) to offload expensive operations while still protecting input privacy
+	•	Tracking only the model weights on a blockchain as the audit/control layer
+	•	Using known plaintext weights for secure, decentralized accumulation of encrypted inputs
+	•	Creating a system that’s:
+	•	Distributed,
+	•	Verifiable,
+	•	Privacy-preserving,
+	•	Modular — nodes can be added/removed, and the blockchain handles continuity
+
+To my knowledge, no academic or industry system has combined these exact primitives using this architectural method.
+
 What exactly does this mean? Well, let me give you some use cases to help you understand what I have created.
 
 Autonomous Systems with Subordinate Agents
@@ -69,30 +81,30 @@ Use Case: Secure Joint Intelligence Analysis
 
  Use Case: Privacy-Preserving Network Routing with ENS
 	•	Scenario: 
-   Each network node has local information (e.g., bandwidth, latency, congestion)
-	 This information is encrypted using a shared Paillier public key
-	 Nodes send encrypted metrics to a swarm node (or set of swarm nodes)
-	 The swarm performs homomorphic accumulation and comparisons
-	 The result helps compute the best next hop, optimal path, or route weights — without any node revealing its actual metrics
-  •	Function:
-  1.	Node A wants to forward a packet
-	2.	It sends:
-	  A request to swarm: “Which neighbor (B, C, D) has best current cost to destination?”
-	  Along with encrypted costs Enc(cost_B), Enc(cost_C), Enc(cost_D)
-	3.	Swarm node performs encrypted comparison logic:
-	  Could apply pre-trained models
-	  Or aggregate encrypted cost values from multiple hops
-	4.	Swarm returns encrypted ranking or recommendation
-	5.	Node A decrypts and selects the best path
-	•	Value:
-    Network privacy	 is maintained because costs and paths stay encrypted, there is no central visibility.
-    Decentralized path selection because multiple swarm nodes can evaluate options independently.
-    Zero trust compliant because nodes don’t need to trust neighbors with raw state.
-    Built in real-time adaptability	because the Model Keeper can retrain based on encrypted traffic stats.
-    Compliance (e.g. anonymity networks)	through traffic shaping and metrics staying fully private.
-It’s especially useful in:
-	•	Zero-trust networks (mesh included)
-	•	Overlay routing (e.g. Tor-like anonymity systems)
-	•	Disaster recovery & ad-hoc tactical networks
+ 	Each network node has local information (e.g., bandwidth, latency, congestion)
+  	This information is encrypted using a shared Paillier public key
+   	Nodes send encrypted metrics to a swarm node (or set of swarm nodes)
+    	The swarm performs homomorphic accumulation and comparisons
+     	The result helps compute the best next hop, optimal path, or route weights — without any node revealing its actual metrics
+      
+        •	Function:
+  	Node A wants to forward a packet
+        It sends:
+		A request to swarm: “Which neighbor (B, C, D) has best current cost to destination?” along with encrypted costs Enc(cost_B), Enc(cost_C), Enc(cost_D)
+        Swarm node performs encrypted comparison logic:
+		Could apply pre-trained models or aggregate encrypted cost values from multiple hops
+        Swarm returns encrypted ranking or recommendation
+	Node A decrypts and selects the best path
+ 
+        •	Value:
+	Network privacy	 is maintained because costs and paths stay encrypted, there is no central visibility.
+        Decentralized path selection because multiple swarm nodes can evaluate options independently.
+	Zero trust compliant because nodes don’t need to trust neighbors with raw state.
+        Built in real-time adaptability	because the Model Keeper can retrain based on encrypted traffic stats.
+	Compliance (e.g. anonymity networks)	through traffic shaping and metrics staying fully private.
+ 	It’s especially useful in:
+  		•	Zero-trust networks (mesh included)
+    		•	Overlay routing (e.g. Tor-like anonymity systems)
+      		•	Disaster recovery & ad-hoc tactical networks
 
 Obviously this can be a powerful tool for many different uses. These are just examples. I'm the only developer on this project. I don't have a college degree. The work you see here is because of research, trial, and error. I have probably made mistakes. There is no warranty AT ALL, in ANYTHING I provide. You use this code/architecture at your own risk.
